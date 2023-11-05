@@ -249,12 +249,13 @@ class OneLogin_Saml2_Auth
      *
      * @throws OneLogin_Saml2_Error
      */
-    public function processSLO($keepLocalSession = false, $requestId = null, $retrieveParametersFromServer = false, $cbDeleteSession = null, $stay = false)
+    public function processSLO($keepLocalSession = false, $requestId = null, $retrieveParametersFromServer = false, $cbDeleteSession = null, $stay = false, $payload = null)
     {
         $this->_errors = array();
         $this->_errorReason = null;
-        if (isset($_GET['SAMLResponse'])) {
-            $logoutResponse = new OneLogin_Saml2_LogoutResponse($this->_settings, $_GET['SAMLResponse']);
+        $payload = $payload ?: $_GET;
+        if (isset($payload['SAMLResponse'])) {
+            $logoutResponse = new OneLogin_Saml2_LogoutResponse($this->_settings, $payload['SAMLResponse']);
             $this->_lastResponse = $logoutResponse->getXML();
             if (!$logoutResponse->isValid($requestId, $retrieveParametersFromServer)) {
                 $this->_errors[] = 'invalid_logout_response';
@@ -271,8 +272,8 @@ class OneLogin_Saml2_Auth
                     }
                 }
             }
-        } else if (isset($_GET['SAMLRequest'])) {
-            $logoutRequest = new OneLogin_Saml2_LogoutRequest($this->_settings, $_GET['SAMLRequest']);
+        } else if (isset($payload['SAMLRequest'])) {
+            $logoutRequest = new OneLogin_Saml2_LogoutRequest($this->_settings, $payload['SAMLRequest']);
             $this->_lastRequest = $logoutRequest->getXML();
             if (!$logoutRequest->isValid($retrieveParametersFromServer)) {
                 $this->_errors[] = 'invalid_logout_request';
@@ -294,8 +295,8 @@ class OneLogin_Saml2_Auth
                 $logoutResponse = $responseBuilder->getResponse();
 
                 $parameters = array('SAMLResponse' => $logoutResponse);
-                if (isset($_GET['RelayState'])) {
-                    $parameters['RelayState'] = $_GET['RelayState'];
+                if (isset($payload['RelayState'])) {
+                    $parameters['RelayState'] = $payload['RelayState'];
                 }
 
                 $security = $this->_settings->getSecurityData();
@@ -305,7 +306,7 @@ class OneLogin_Saml2_Auth
                     $parameters['Signature'] = $signature;
                 }
 
-                return $this->redirectTo($this->getSLOResponseUrl(), $parameters, $stay);
+                return $this->redirectTo($this->getSLOResponseUrl(), $parameters, $stay, $payload);
             }
         } else {
             $this->_errors[] = 'invalid_binding';
@@ -328,13 +329,14 @@ class OneLogin_Saml2_Auth
      *
      * @throws OneLogin_Saml2_Error
      */
-    public function redirectTo($url = '', $parameters = array(), $stay = false)
+    public function redirectTo($url = '', $parameters = array(), $stay = false, $payload = null)
     {
         assert('is_string($url)');
         assert('is_array($parameters)');
 
-        if (empty($url) && isset($_REQUEST['RelayState'])) {
-            $url = $_REQUEST['RelayState'];
+        $payload = $payload ?: $_REQUEST;
+        if (empty($url) && isset($payload['RelayState'])) {
+            $url = $payload['RelayState'];
         }
 
         return OneLogin_Saml2_Utils::redirect($url, $parameters, $stay);
