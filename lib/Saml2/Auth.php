@@ -201,10 +201,11 @@ class OneLogin_Saml2_Auth
      * @throws OneLogin_Saml2_Error
      * @throws OneLogin_Saml2_ValidationError
      */
-    public function processResponse($requestId = null, $payload =[])
+    public function processResponse($requestId = null, $payload = null)
     {
         $this->_errors = array();
         $this->_errorReason = null;
+        $payload = $payload ?: $_POST;
         if (isset($payload['SAMLResponse'])) {
             // AuthnResponse -- HTTP_POST Binding
             $response = new OneLogin_Saml2_Response($this->_settings, $payload['SAMLResponse']);
