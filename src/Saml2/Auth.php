@@ -220,17 +220,19 @@ class Auth
      * Process the SAML Response sent by the IdP.
      *
      * @param string|null $requestId The ID of the AuthNRequest sent by this SP to the IdP
-     *
+     * @param array $payload
      * @throws Error
      * @throws ValidationError
      */
-    public function processResponse($requestId = null)
+    public function processResponse($requestId = null, $payload = null)
     {
         $this->_errors = array();
         $this->_lastError = $this->_lastErrorException = null;
-        if (isset($_POST['SAMLResponse'])) {
+
+        $payload = $payload ?? $_POST;
+        if (isset($payload['SAMLResponse'])) {
             // AuthnResponse -- HTTP_POST Binding
-            $response = new Response($this->_settings, $_POST['SAMLResponse']);
+            $response = new Response($this->_settings, $payload['SAMLResponse']);
             $this->_lastResponse = $response->getXMLDocument();
 
             if ($response->isValid($requestId)) {
@@ -263,22 +265,24 @@ class Auth
     /**
      * Process the SAML Logout Response / Logout Request sent by the IdP.
      *
-     * @param bool        $keepLocalSession             When false will destroy the local session, otherwise will keep it
-     * @param string|null $requestId                    The ID of the LogoutRequest sent by this SP to the IdP
-     * @param bool        $retrieveParametersFromServer True if we want to use parameters from $_SERVER to validate the signature
-     * @param callable    $cbDeleteSession              Callback to be executed to delete session
-     * @param bool        $stay                         True if we want to stay (returns the url string) False to redirect
-     *
+     * @param bool $keepLocalSession When false will destroy the local session, otherwise will keep it
+     * @param string|null $requestId The ID of the LogoutRequest sent by this SP to the IdP
+     * @param bool $retrieveParametersFromServer True if we want to use parameters from $_SERVER to validate the signature
+     * @param null $cbDeleteSession Callback to be executed to delete session
+     * @param bool $stay True if we want to stay (returns the url string) False to redirect
+     * @param array $payload
      * @return string|null
      *
      * @throws Error
+     * @throws ValidationError
      */
-    public function processSLO($keepLocalSession = false, $requestId = null, $retrieveParametersFromServer = false, $cbDeleteSession = null, $stay = false)
+    public function processSLO($keepLocalSession = false, $requestId = null, $retrieveParametersFromServer = false, $cbDeleteSession = null, $stay = false, $payload = null)
     {
         $this->_errors = array();
         $this->_lastError = $this->_lastErrorException = null;
-        if (isset($_GET['SAMLResponse'])) {
-            $logoutResponse = new LogoutResponse($this->_settings, $_GET['SAMLResponse']);
+        $payload = $payload ?: $_GET;
+        if (isset($payload['SAMLResponse'])) {
+            $logoutResponse = new LogoutResponse($this->_settings, $payload['SAMLResponse']);
             $this->_lastResponse = $logoutResponse->getXML();
             if (!$logoutResponse->isValid($requestId, $retrieveParametersFromServer)) {
                 $this->_errors[] = 'invalid_logout_response';
@@ -297,8 +301,8 @@ class Auth
                     }
                 }
             }
-        } else if (isset($_GET['SAMLRequest'])) {
-            $logoutRequest = new LogoutRequest($this->_settings, $_GET['SAMLRequest']);
+        } else if (isset($payload['SAMLRequest'])) {
+            $logoutRequest = new LogoutRequest($this->_settings, $payload['SAMLRequest']);
             $this->_lastRequest = $logoutRequest->getXML();
             if (!$logoutRequest->isValid($retrieveParametersFromServer)) {
                 $this->_errors[] = 'invalid_logout_request';
@@ -321,8 +325,8 @@ class Auth
                 $logoutResponse = $responseBuilder->getResponse();
 
                 $parameters = array('SAMLResponse' => $logoutResponse);
-                if (isset($_GET['RelayState'])) {
-                    $parameters['RelayState'] = $_GET['RelayState'];
+                if (isset($payload['RelayState'])) {
+                    $parameters['RelayState'] = $payload['RelayState'];
                 }
 
                 $security = $this->_settings->getSecurityData();
@@ -332,7 +336,7 @@ class Auth
                     $parameters['Signature'] = $signature;
                 }
 
-                return $this->redirectTo($this->getSLOResponseUrl(), $parameters, $stay);
+                return $this->redirectTo($this->getSLOResponseUrl(), $parameters, $stay, $payload);
             }
         } else {
             $this->_errors[] = 'invalid_binding';
@@ -353,12 +357,13 @@ class Auth
      *
      * @return string|null
      */
-    public function redirectTo($url = '', array $parameters = array(), $stay = false)
+    public function redirectTo($url = '', array $parameters = array(), $stay = false, $payload = null)
     {
         assert(is_string($url));
 
-        if (empty($url) && isset($_REQUEST['RelayState'])) {
-            $url = $_REQUEST['RelayState'];
+        $payload = $payload ?? $_REQUEST;
+        if (empty($url) && isset($payload['RelayState'])) {
+            $url = $payload['RelayState'];
         }
 
         return Utils::redirect($url, $parameters, $stay);
